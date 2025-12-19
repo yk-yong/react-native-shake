@@ -108,10 +108,6 @@ RCT_EXPORT_MODULE()
       params);
 }
 
-+ (NSString *)moduleName {
-  return @"ReactNativeShake";
-}
-
 + (BOOL)requiresMainQueueSetup {
   return YES;
 }
