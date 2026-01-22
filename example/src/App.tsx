@@ -3,24 +3,36 @@ import {
   startShakeDetection,
   stopShakeDetection,
 } from '@yk-yong/react-native-shake';
-import { useEffect } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 export default function App() {
-  useEffect(() => {
-    startShakeDetection();
+  const [deviceShaken, setDeviceShaken] = useState(false);
 
-    shakeEventEmitter.addListener('ShakeEvent', () => {
-      Alert.alert('Shake detection started.', 'Device was shaken!');
+  useEffect(() => {
+    try {
+      startShakeDetection();
+      console.log('SHAKE DETECTION STARTED');
+    } catch (error) {
+      console.error('Error starting shake detection:', error);
+    }
+
+    const subscription = shakeEventEmitter.addListener('ShakeEvent', () => {
+      setDeviceShaken(true);
       console.log('Device shaken!');
     });
 
     return () => {
+      subscription.remove();
       stopShakeDetection();
     };
   }, []);
 
-  return <View style={styles.container} />;
+  return (
+    <View style={styles.container}>
+      {deviceShaken && <Text>Device was shaken!</Text>}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

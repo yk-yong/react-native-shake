@@ -1,21 +1,43 @@
 #import "ReactNativeShake.h"
 #import <React/RCTBridge.h>
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 
-@interface ShakeWindow : UIWindow
-@property(nonatomic, weak) ReactNativeShake *shakeModule;
+static __weak ReactNativeShake *gShakeModule = nil;
+
+@interface UIWindow (ReactNativeShake)
 @end
 
-@implementation ShakeWindow
+@implementation UIWindow (ReactNativeShake)
 
-- (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event {
-  if (motion == UIEventSubtypeMotionShake && self.shakeModule.isListening) {
-    [self.shakeModule sendShakeEvent];
+- (void)rns_motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event {
+  [self rns_motionEnded:motion withEvent:event];
+
+  ReactNativeShake *module = gShakeModule;
+  if (motion == UIEventSubtypeMotionShake && module && module.isListening) {
+    [module sendShakeEvent];
   }
-  [super motionEnded:motion withEvent:event];
 }
 
 @end
+
+static void rns_swizzleMotionEndedIfNeeded(void) {
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    Class cls = [UIWindow class];
+    SEL originalSelector = @selector(motionEnded:withEvent:);
+    SEL swizzledSelector = @selector(rns_motionEnded:withEvent:);
+
+    Method originalMethod = class_getInstanceMethod(cls, originalSelector);
+    Method swizzledMethod = class_getInstanceMethod(cls, swizzledSelector);
+
+    if (!originalMethod || !swizzledMethod) {
+      return;
+    }
+
+    method_exchangeImplementations(originalMethod, swizzledMethod);
+  });
+}
 
 @implementation ReactNativeShake
 
@@ -49,17 +71,9 @@ RCT_EXPORT_MODULE()
   _isListening = YES;
 
   dispatch_async(dispatch_get_main_queue(), ^{
-    UIWindow *window = [self getKeyWindow];
-    if (window && ![window isKindOfClass:[ShakeWindow class]]) {
-      ShakeWindow *shakeWindow =
-          [[ShakeWindow alloc] initWithFrame:window.frame];
-      shakeWindow.shakeModule = self;
-      shakeWindow.rootViewController = window.rootViewController;
-      shakeWindow.windowLevel = window.windowLevel;
-      [shakeWindow makeKeyAndVisible];
-    } else if ([window isKindOfClass:[ShakeWindow class]]) {
-      ((ShakeWindow *)window).shakeModule = self;
-    }
+    rns_swizzleMotionEndedIfNeeded();
+    gShakeModule = self;
+    NSLog(@"[ReactNativeShake] Shake detection started");
   });
 }
 
@@ -71,10 +85,10 @@ RCT_EXPORT_MODULE()
   _isListening = NO;
 
   dispatch_async(dispatch_get_main_queue(), ^{
-    UIWindow *window = [self getKeyWindow];
-    if ([window isKindOfClass:[ShakeWindow class]]) {
-      ((ShakeWindow *)window).shakeModule = nil;
+    if (gShakeModule == self) {
+      gShakeModule = nil;
     }
+    NSLog(@"[ReactNativeShake] Shake detection stopped");
   });
 }
 
@@ -84,22 +98,12 @@ RCT_EXPORT_MODULE()
   }
 }
 
-- (UIWindow *)getKeyWindow {
-  NSArray<UIWindow *> *windows = [[UIApplication sharedApplication] windows];
-  for (UIWindow *window in windows) {
-    if (window.isKeyWindow) {
-      return window;
-    }
-  }
-  return nil;
-}
-
 - (void)addListener:(NSString *)eventType {
-  // Required for RCTEventEmitter
+  [super addListener:eventType];
 }
 
 - (void)removeListeners:(double)count {
-  // Required for RCTEventEmitter
+  [super removeListeners:count];
 }
 
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
