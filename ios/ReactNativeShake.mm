@@ -5,10 +5,10 @@
 
 static __weak ReactNativeShake *gShakeModule = nil;
 
-@interface UIWindow (ReactNativeShake)
+@interface UIResponder (ReactNativeShake)
 @end
 
-@implementation UIWindow (ReactNativeShake)
+@implementation UIResponder (ReactNativeShake)
 
 - (void)rns_motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event {
   [self rns_motionEnded:motion withEvent:event];
@@ -24,7 +24,7 @@ static __weak ReactNativeShake *gShakeModule = nil;
 static void rns_swizzleMotionEndedIfNeeded(void) {
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
-    Class cls = [UIWindow class];
+    Class cls = [UIResponder class];
     SEL originalSelector = @selector(motionEnded:withEvent:);
     SEL swizzledSelector = @selector(rns_motionEnded:withEvent:);
 
